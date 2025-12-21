@@ -12,6 +12,8 @@ Standard Matplotlib only supports single-color text. To create multi-colored tex
 
 **mpl-richtext** solves this by letting you specify colors and styles for each text segment in one simple function call.
 
+![mpl-richtext Showcase](examples/mpl_richtext_showcase.png)
+
 ## Installation
 
 ```bash
@@ -44,65 +46,38 @@ plt.show()
 🎯 **Full alignment** - Left, center, right horizontal and vertical alignment  
 ⚡ **Easy to use** - Simple API, works with any Matplotlib axes
 
-## Examples
+## Real-World Example
 
-### Basic Multi-Color Text
+Here is a comprehensive example showing syntax highlighting, annotations, and complex formatting:
 
 ```python
-from mpl_richtext import richtext
 import matplotlib.pyplot as plt
+from mpl_richtext import richtext
+import numpy as np
 
-fig, ax = plt.subplots()
-richtext(0.5, 0.5,
-         strings=["Error: ", "File not found"],
-         colors=["red", "black"],
-         ax=ax, fontsize=16, fontweight='bold',
-         transform=ax.transAxes)
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.axis('off')
+
+# 1. Syntax Highlighting Simulation
+code_lines = [
+    (["def ", "calculate_metrics", "(", "data", ", ", "threshold", "=0.5):"],
+     ["#cc7832", "#ffc66d", "#a9b7c6", "#a9b7c6", "#cc7832", "#a9b7c6", "#6897bb"]),
+    
+    (["    ", "if ", "data", ".max() > ", "threshold", ":"],
+     ["", "#cc7832", "#a9b7c6", "#a9b7c6", "#a9b7c6", "#cc7832"]),
+    
+    (["        ", "return ", "True"],
+     ["", "#cc7832", "#cc7832"])
+]
+
+y_pos = 0.8
+for strings, colors in code_lines:
+    richtext(0.1, y_pos, strings, colors, ax=ax, 
+             fontfamily='monospace', fontsize=14, 
+             bbox=dict(facecolor='#2b2b2b', alpha=1, pad=10, boxstyle='round'))
+    y_pos -= 0.15
+
 plt.show()
-```
-
-### Mixed Font Sizes
-
-```python
-richtext(0.5, 0.5,
-         strings=["BIG", " medium ", "small"],
-         colors=["red", "blue", "green"],
-         fontsizes=[30, 20, 10],
-         ax=ax, transform=ax.transAxes)
-```
-
-### Code Syntax Highlighting Style
-
-```python
-richtext(0.1, 0.5,
-         strings=["def ", "greet", "(", "name", "):"],
-         colors=["blue", "green", "black", "orange", "black"],
-         ax=ax, fontsize=14, fontfamily='monospace',
-         transform=ax.transAxes)
-```
-
-### Dictionary-Based Coloring
-
-```python
-# Color only specific indices
-richtext(0.5, 0.5,
-         strings=["One ", "Two ", "Three ", "Four"],
-         colors={0: "red", 2: "green"},  # Only color 1st and 3rd
-         ax=ax, fontsize=18, transform=ax.transAxes)
-```
-
-### Word Wrapping
-
-```python
-words = ["This ", "is ", "a ", "long ", "sentence ", "that ", 
-         "will ", "wrap ", "automatically."]
-colors = ["red", "blue", "green"] * 3
-
-richtext(1, 5, 
-         strings=words,
-         colors=colors,
-         box_width=5.0,  # Enable wrapping
-         ax=ax, fontsize=14)
 ```
 
 ## API Reference
@@ -138,56 +113,6 @@ richtext(1, 5,
 **Returns:**
 - `list of Text` - List of created matplotlib Text objects
 
-## Advanced Usage
-
-### Plural Properties
-
-```python
-# Use plural form for per-segment properties
-richtext(0.5, 0.5,
-         strings=["A", "B", "C"],
-         colors=["red", "blue", "green"],
-         fontsizes=[20, 25, 30],        # Different sizes
-         fontweights=["normal", "bold", "light"],  # Different weights
-         ax=ax, transform=ax.transAxes)
-```
-
-### Property Extension
-
-```python
-# Provide fewer colors than segments - last color repeats
-richtext(0.5, 0.5,
-         strings=["One", "Two", "Three", "Four", "Five"],
-         colors=["red", "blue"],  # "blue" extends to remaining segments
-         ax=ax, transform=ax.transAxes)
-```
-
-### Alignment Options
-
-```python
-# Center-aligned text block
-richtext(0.5, 0.5,
-         strings=["Centered ", "text"],
-         colors=["red", "blue"],
-         ha='center',  # Horizontal alignment
-         va='center',  # Vertical alignment
-         ax=ax, transform=ax.transAxes)
-```
-
-## Real-World Use Cases
-
-- 🎯 **Syntax highlighting** in code examples
-- 📊 **Colorful annotations** on plots
-- ⚠️ **Styled error/warning messages**
-- 🎨 **Creative titles and labels**
-- 📈 **Data visualization callouts**
-- 🎓 **Educational diagrams**
-
-## Requirements
-
-- Python >= 3.8
-- Matplotlib >= 3.5.0
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -202,25 +127,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- Inspired by the need for easier multi-styled text in Matplotlib
-- Built on top of the excellent Matplotlib library
-
 ## Links
 
-- **Documentation:** [Coming soon]
 - **PyPI:** https://pypi.org/project/mpl-richtext/
-- **GitHub:** https://github.com/yourusername/mpl-richtext
-- **Issues:** https://github.com/yourusername/mpl-richtext/issues
-
-## Support
-
-If you find this library useful, please consider:
-- ⭐ Starring the repository
-- 🐛 Reporting bugs
-- 💡 Suggesting new features
-- 📖 Improving documentation
+- **GitHub:** https://github.com/ra8in/mpl-richtext
+- **Issues:** https://github.com/ra8in/mpl-richtext/issues
 
 ---
 

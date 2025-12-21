@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Rabin Katel", email = "kattelrabinraja13@gmail.com"}
 ]
 keywords = [
     "matplotlib",
@@ -49,10 +49,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/mpl-richtext"
-Documentation = "https://github.com/yourusername/mpl-richtext#readme"
-Repository = "https://github.com/yourusername/mpl-richtext"
-"Bug Tracker" = "https://github.com/yourusername/mpl-richtext/issues"
+Homepage = "https://github.com/ra8in/mpl-richtext"
+Documentation = "https://github.com/ra8in/mpl-richtext#readme"
+Repository = "https://github.com/ra8in/mpl-richtext"
+"Bug Tracker" = "https://github.com/ra8in/mpl-richtext/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "mpl_richtext.version.__version__"}

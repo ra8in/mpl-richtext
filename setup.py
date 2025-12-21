@@ -20,11 +20,11 @@ setup(
     description="Rich text rendering for Matplotlib with multi-color, mutli(fonts size, font family, font weight) and multi-style support",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/mpl-richtext",  # CHANGE THIS
+    url="https://github.com/ra8in/mpl-richtext",
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/mpl-richtext/issues",  # CHANGE THIS
-        "Documentation": "https://github.com/yourusername/mpl-richtext#readme",  # CHANGE THIS
-        "Source Code": "https://github.com/yourusername/mpl-richtext",  # CHANGE THIS
+        "Bug Tracker": "https://github.com/ra8in/mpl-richtext/issues",
+        "Documentation": "https://github.com/ra8in/mpl-richtext#readme",
+        "Source Code": "https://github.com/ra8in/mpl-richtext",
     },
     packages=find_packages(exclude=["tests", "examples", "docs"]),
     classifiers=[
