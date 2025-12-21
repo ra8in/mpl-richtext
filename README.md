@@ -37,48 +37,23 @@ richtext(0.5, 0.5,
 plt.show()
 ```
 
+
+
 ## Features
 
+
+
 ✨ **Multi-color text** - Different colors for each word or character  
-🎨 **Multi-style text** - Mix font sizes, weights, families in one line  
+🎨 **Multi-style text** - Mix font sizes, weights, families, and styles (italic/oblique)  
 📦 **Flexible input** - Lists, dicts, or tuples for colors and properties  
 📏 **Auto word-wrapping** - Specify `box_width` for automatic text wrapping  
 🎯 **Full alignment** - Left, center, right horizontal and vertical alignment  
+✨ **Decorations** - Support for **underlines** and **background colors**  
+🔄 **Transformations** - Support for text **rotation**  
+👻 **Transparency** - Support for **alpha** values per segment  
 ⚡ **Easy to use** - Simple API, works with any Matplotlib axes
 
-## Real-World Example
 
-Here is a comprehensive example showing syntax highlighting, annotations, and complex formatting:
-
-```python
-import matplotlib.pyplot as plt
-from mpl_richtext import richtext
-import numpy as np
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.axis('off')
-
-# 1. Syntax Highlighting Simulation
-code_lines = [
-    (["def ", "calculate_metrics", "(", "data", ", ", "threshold", "=0.5):"],
-     ["#cc7832", "#ffc66d", "#a9b7c6", "#a9b7c6", "#cc7832", "#a9b7c6", "#6897bb"]),
-    
-    (["    ", "if ", "data", ".max() > ", "threshold", ":"],
-     ["", "#cc7832", "#a9b7c6", "#a9b7c6", "#a9b7c6", "#cc7832"]),
-    
-    (["        ", "return ", "True"],
-     ["", "#cc7832", "#cc7832"])
-]
-
-y_pos = 0.8
-for strings, colors in code_lines:
-    richtext(0.1, y_pos, strings, colors, ax=ax, 
-             fontfamily='monospace', fontsize=14, 
-             bbox=dict(facecolor='#2b2b2b', alpha=1, pad=10, boxstyle='round'))
-    y_pos -= 0.15
-
-plt.show()
-```
 
 ## API Reference
 

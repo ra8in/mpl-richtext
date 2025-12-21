@@ -140,3 +140,4 @@ Thumbs.db
 *.pdf
 !docs/images/*.png
 !docs/images/*.jpg
+!examples/*.png
