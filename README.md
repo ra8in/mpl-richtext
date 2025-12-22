@@ -12,7 +12,8 @@ Standard Matplotlib only supports single-color text. To create multi-colored tex
 
 **mpl-richtext** solves this by letting you specify colors and styles for each text segment in one simple function call.
 
-![mpl-richtext Showcase](https://github.com/ra8in/mpl-richtext/blob/master/examples/mpl_richtext_examples.png)
+
+![mpl-richtext Showcase](https://raw.githubusercontent.com/ra8in/mpl-richtext/master/examples/mpl_richtext_examples.png)
 
 ## Installation
 
