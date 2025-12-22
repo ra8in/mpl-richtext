@@ -2,7 +2,7 @@
 
 **Rich text rendering for Matplotlib** - Create beautiful multi-color, multi-style text in a single line.
 
-[![PyPI version](https://badge.fury.io/py/mpl-richtext.svg)](https://pypi.org/project/mpl-richtext/)
+[![PyPI version](https://img.shields.io/pypi/v/mpl-richtext.svg)](https://pypi.org/project/mpl-richtext/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
