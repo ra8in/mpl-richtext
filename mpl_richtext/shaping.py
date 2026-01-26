@@ -281,7 +281,9 @@ class ShapedText(Text):
             
             glyph_trans = Affine2D().translate(gx, gy) + base_transform + align_transform + placement_transform
             
-            renderer.draw_path(gc, path, glyph_trans)
+            from matplotlib.colors import to_rgba
+            rgba_color = to_rgba(self.get_color(), alpha=self.get_alpha())
+            renderer.draw_path(gc, path, glyph_trans, rgbFace=rgba_color)
             
         gc.restore()
 
