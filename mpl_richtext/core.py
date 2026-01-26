@@ -2,7 +2,28 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.text import Text
 from matplotlib.lines import Line2D
+from matplotlib.lines import Line2D
+import matplotlib.font_manager as fm
+from matplotlib.font_manager import FontProperties, findfont
 from typing import List, Optional, Tuple, Union, Dict, Any
+
+from .shaping import ShapedText, HarfbuzzShaper, HAS_HARFBUZZ
+
+def _needs_complex_shaping(text: str) -> bool:
+    """
+    Check if text contains characters from complex scripts that need HarfBuzz shaping.
+    Currently checks for Devanagari (used for Nepali, Hindi, Sanskrit, etc.)
+    """
+    for char in text:
+        code = ord(char)
+        # Devanagari: U+0900 to U+097F
+        # Devanagari Extended: U+A8E0 to U+A8FF  
+        # Vedic Extensions: U+1CD0 to U+1CFF
+        if (0x0900 <= code <= 0x097F or 
+            0xA8E0 <= code <= 0xA8FF or
+            0x1CD0 <= code <= 0x1CFF):
+            return True
+    return False
 
 def richtext(
     x: float,
@@ -14,6 +35,7 @@ def richtext(
 ) -> List[Text]:
     """
     Display text with different colors and properties for each string, supporting word wrapping and alignment.
+    Supports complex scripts (e.g. Nepali) via manual shaping if uharfbuzz is installed.
 
     Parameters
     ----------
@@ -272,6 +294,46 @@ def _get_text_width(text: str, ax: Axes, renderer, **text_kwargs) -> float:
     kwargs = text_kwargs.copy()
     kwargs.pop('underline', None)
     
+    # Try shaping if available
+    if HAS_HARFBUZZ:
+        font = kwargs.get('fontfamily') or kwargs.get('family') or plt.rcParams['font.family'][0]
+        # Resolve font path
+        try:
+            # Handle fontfamily being None or list
+            if not font:
+                 font = plt.rcParams['font.family'][0]
+            if isinstance(font, list):
+                font = font[0]
+                
+            fp = FontProperties(family=font)
+            path = findfont(fp)
+            
+            # Simple caching could go here
+            if path:
+                fontsize = kwargs.get('fontsize') or kwargs.get('size') or plt.rcParams['font.size']
+                shaper = HarfbuzzShaper(path)
+                width_points = shaper.get_text_width(text, fontsize)
+                
+                # Convert points -> pixels -> data
+                # 1. Points to Pixels
+                pixels = renderer.points_to_pixels(width_points)
+                
+                # 2. Pixels to Data
+                # We can measure the width of a 0-width line vs 'pixels'-width line?
+                # Or use proper transform math.
+                # bbox width in pixels = 'pixels'.
+                # We want width in data.
+                
+                # Create a bbox in display coords
+                from matplotlib.transforms import Bbox
+                bbox_display = Bbox.from_bounds(0, 0, pixels, 0)
+                
+                # Transform to data coords
+                bbox_data = bbox_display.transformed(ax.transData.inverted())
+                return bbox_data.width
+        except Exception:
+            pass # Fallback to native
+
     t = ax.text(0, 0, text, **kwargs)
     bbox = t.get_window_extent(renderer=renderer)
     bbox_data = bbox.transformed(ax.transData.inverted())
@@ -280,11 +342,101 @@ def _get_text_width(text: str, ax: Axes, renderer, **text_kwargs) -> float:
     return w
 
 
+def _get_text_metrics(text: str, ax: Axes, renderer, **text_kwargs) -> tuple:
+    """
+    Get text metrics: (width, ascent) in data units.
+    - width: horizontal extent
+    - ascent: distance from baseline to top of text
+    """
+    kwargs = text_kwargs.copy()
+    kwargs.pop('underline', None)
+    
+    # Try shaping if available
+    if HAS_HARFBUZZ:
+        font = kwargs.get('fontfamily') or kwargs.get('family')
+        try:
+            if not font:
+                font = plt.rcParams['font.family'][0]
+            if isinstance(font, list):
+                font = font[0]
+                
+            fp = FontProperties(family=font)
+            path = findfont(fp)
+            
+            if path:
+                fontsize = kwargs.get('fontsize') or kwargs.get('size') or plt.rcParams['font.size']
+                shaper = HarfbuzzShaper(path)
+                
+                # Get width and ascent in points
+                width_points = shaper.get_text_width(text, fontsize)
+                ascent_points = shaper.get_ascent(fontsize)
+                
+                # Convert to pixels then to data units
+                from matplotlib.transforms import Bbox
+                
+                width_px = renderer.points_to_pixels(width_points)
+                ascent_px = renderer.points_to_pixels(ascent_points)
+                
+                # Width: horizontal conversion
+                bbox_w = Bbox.from_bounds(0, 0, width_px, 0)
+                width_data = bbox_w.transformed(ax.transData.inverted()).width
+                
+                # Ascent: vertical conversion
+                bbox_a = Bbox.from_bounds(0, 0, 0, ascent_px)
+                ascent_data = bbox_a.transformed(ax.transData.inverted()).height
+                
+                return (width_data, ascent_data)
+        except Exception:
+            pass  # Fallback to native
+    
+    # Native measurement
+    t = ax.text(0, 0, text, **kwargs)
+    bbox = t.get_window_extent(renderer=renderer)
+    bbox_data = bbox.transformed(ax.transData.inverted())
+    
+    width_data = bbox_data.width
+    # For native text, ascent ≈ height (simplified; baseline is at bottom of bbox)
+    ascent_data = bbox_data.height
+    
+    t.remove()
+    return (width_data, ascent_data)
+
+
 def _get_text_height(text: str, ax: Axes, renderer, **text_kwargs) -> float:
     """Measure the height of a text string."""
     # Remove custom properties that ax.text doesn't understand
     kwargs = text_kwargs.copy()
     kwargs.pop('underline', None)
+
+    # Try shaping-based height for Devanagari fonts
+    # This avoids measuring with Latin chars that the font might not have
+    if HAS_HARFBUZZ:
+        try:
+            font = kwargs.get('fontfamily') or kwargs.get('family')
+            if not font:
+                font = plt.rcParams['font.family'][0]
+            if isinstance(font, list):
+                font = font[0]
+            
+            # Check if this is a known Devanagari font
+            devanagari_fonts = ['Noto Sans Devanagari', 'Kalimati', 'Mangal', 'Lohit Devanagari', 'Madan']
+            if font and any(df.lower() in str(font).lower() for df in devanagari_fonts):
+                fp = FontProperties(family=font)
+                path = findfont(fp)
+                
+                if path:
+                    fontsize = kwargs.get('fontsize') or kwargs.get('size') or plt.rcParams['font.size']
+                    shaper = HarfbuzzShaper(path)
+                    height_points = shaper.get_font_height(fontsize)
+                    
+                    # Convert points -> pixels -> data
+                    pixels = renderer.points_to_pixels(height_points)
+                    from matplotlib.transforms import Bbox
+                    bbox_display = Bbox.from_bounds(0, 0, 0, pixels)
+                    bbox_data = bbox_display.transformed(ax.transData.inverted())
+                    return bbox_data.height
+        except Exception:
+            pass  # Fallback to native
 
     # Use a representative character for height if text is empty or space
     # But we need the height of THIS specific font configuration.
@@ -302,24 +454,25 @@ def _build_lines_wrapped(
     ax: Axes, 
     renderer, 
     box_width: float
-) -> List[List[Tuple[str, Dict[str, Any], float]]]:
+) -> List[List[Tuple[str, Dict[str, Any], float, float]]]:
     """
     Group words into lines based on box_width.
+    Returns: List of lines, where each line is List of (word, props, width, ascent).
     """
-    lines: List[List[Tuple[str, Dict[str, Any], float]]] = []
-    current_line: List[Tuple[str, Dict[str, Any], float]] = []
+    lines: List[List[Tuple[str, Dict[str, Any], float, float]]] = []
+    current_line: List[Tuple[str, Dict[str, Any], float, float]] = []
     current_line_width = 0.0
 
     for word, props in words:
-        w = _get_text_width(word, ax, renderer, **props)
+        w, asc = _get_text_metrics(word, ax, renderer, **props)
         
         if current_line_width + w > box_width and current_line:
             # Wrap to new line
             lines.append(current_line)
-            current_line = [(word, props, w)]
+            current_line = [(word, props, w, asc)]
             current_line_width = w
         else:
-            current_line.append((word, props, w))
+            current_line.append((word, props, w, asc))
             current_line_width += w
             
     if current_line:
@@ -333,19 +486,20 @@ def _build_line_seamless(
     properties: List[Dict[str, Any]],
     ax: Axes,
     renderer
-) -> List[Tuple[str, Dict[str, Any], float]]:
+) -> List[Tuple[str, Dict[str, Any], float, float]]:
     """
     Build a single line from strings without splitting by spaces.
+    Returns: List of (string, props, width, ascent).
     """
-    line: List[Tuple[str, Dict[str, Any], float]] = []
+    line: List[Tuple[str, Dict[str, Any], float, float]] = []
     for string, props in zip(strings, properties):
-        w = _get_text_width(string, ax, renderer, **props)
-        line.append((string, props, w))
+        w, asc = _get_text_metrics(string, ax, renderer, **props)
+        line.append((string, props, w, asc))
     return line
 
 
 def _draw_lines(
-    lines: List[List[Tuple[str, Dict[str, Any], float]]],
+    lines: List[List[Tuple[str, Dict[str, Any], float, float]]],
     x: float,
     y: float,
     ax: Axes,
@@ -357,24 +511,26 @@ def _draw_lines(
     zorder: int
 ) -> List[Text]:
     """
-    Draw the lines of text onto the axes.
+    Draw the lines of text onto the axes using baseline alignment.
+    Each line item is (word, props, width, ascent).
     """
     text_objects: List[Text] = []
     
-    # Calculate height for each line
-    line_heights = []
+    # Calculate metrics for each line
+    line_metrics = []
     for line in lines:
-        # Find max height in this line
-        max_h = 0.0
-        for word, props, _ in line:
+        # Find max ascent and max total height in this line
+        max_ascent = max(item[3] for item in line) if line else 0.0
+        max_height = 0.0
+        for word, props, w, asc in line:
             h = _get_text_height(word, ax, renderer, **props)
-            if h > max_h:
-                max_h = h
-        line_heights.append(max_h * linespacing)
+            if h > max_height:
+                max_height = h
+        line_metrics.append((max_ascent, max_height * linespacing))
         
-    total_block_height = sum(line_heights)
+    total_block_height = sum(m[1] for m in line_metrics)
     
-    # Calculate top Y position based on vertical alignment
+    # Calculate top Y position based on vertical alignment of the block
     if va == 'center':
         top_y = y + (total_block_height / 2)
     elif va == 'top':
@@ -387,10 +543,11 @@ def _draw_lines(
     current_y = top_y
     
     for i, line in enumerate(lines):
-        line_height = line_heights[i]
+        max_ascent, line_height = line_metrics[i]
         
-        # Position line center
-        line_center_y = current_y - (line_height / 2)
+        # Calculate baseline position
+        # Baseline is at: top of line - max_ascent
+        baseline_y = current_y - max_ascent
         
         # Calculate line width for horizontal alignment
         line_width = sum(item[2] for item in line)
@@ -399,25 +556,50 @@ def _draw_lines(
             line_start_x = x - (line_width / 2)
         elif ha == 'right':
             line_start_x = x - line_width
-        else: # left
+        else:  # left
             line_start_x = x
             
         current_x = line_start_x
         
-        for word, props, w in line:
+        for word, props, w, asc in line:
             text_kwargs = props.copy()
             
             # Extract underline property
             underline = text_kwargs.pop('underline', False)
             
+            # Use baseline alignment for all text
             text_kwargs.update({
-                'va': 'center', 
+                'va': 'baseline', 
                 'ha': 'left',
                 'transform': transform,
                 'zorder': zorder
             })
             
-            t = ax.text(current_x, line_center_y, word, **text_kwargs)
+            # Determine if we should use ShapedText
+            used_shaper = False
+            t = None
+            
+            if HAS_HARFBUZZ and _needs_complex_shaping(word):
+                try:
+                    font = text_kwargs.get('fontfamily') or text_kwargs.get('family')
+                    if not font:
+                        font = plt.rcParams['font.family'][0]
+                    if isinstance(font, list):
+                        font = font[0]
+                        
+                    fp = FontProperties(family=font)
+                    path = findfont(fp)
+                    
+                    if path:
+                        t = ShapedText(current_x, baseline_y, word, font_path=path, **text_kwargs)
+                        ax.add_artist(t)
+                        used_shaper = True
+                except Exception as e:
+                    pass
+            
+            if not used_shaper:
+                t = ax.text(current_x, baseline_y, word, **text_kwargs)
+                
             text_objects.append(t)
             
             # Draw underline if requested
@@ -433,11 +615,34 @@ def _draw_lines(
                 # Let's put the underline at line_center_y - (h/2) - padding?
                 
                 # Let's use the bbox of the text object to find the bottom
-                bbox = t.get_window_extent(renderer=renderer)
-                bbox_data = bbox.transformed(ax.transData.inverted())
+                # bbox = t.get_window_extent(renderer=renderer)
+                # bbox_data = bbox.transformed(ax.transData.inverted())
                 
                 # y0 is the bottom of the text bbox
-                y_bottom = bbox_data.y0
+                # y_bottom = bbox_data.y0
+                
+                # Since ShapedText might behave differently with bbox, and we already know 'w'.
+                # And we aligned 'va=center'.
+                # Let's use the line_center_y and offset down.
+                # Text Height approximation:
+                fontsize = text_kwargs.get('fontsize', 12)
+                # data_height approximation? 
+                # This is risky if aspect ratio is not 1.
+                # Fallback to bbox logic, assuming draw has happened?
+                # ShapedText needs to be drawn to have a valid bbox?
+                # In Matplotlib, get_window_extent() triggers a draw if needed? 
+                # Or we can just trust the metrics.
+                
+                # For consistency with previous code, let's try getting bbox.
+                try:
+                    bbox = t.get_window_extent(renderer=renderer)
+                    bbox_data = bbox.transformed(ax.transData.inverted())
+                    y_bottom = bbox_data.y0
+                except Exception:
+                    # Fallback if renderer issue
+                    y_bottom = line_center_y - 5 # arbitrary?
+                
+                # Draw line from current_x to current_x + w
                 
                 # Draw line from current_x to current_x + w
                 # Use the same color as the text
