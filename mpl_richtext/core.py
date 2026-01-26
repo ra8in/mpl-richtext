@@ -372,7 +372,9 @@ def _get_text_metrics(text: str, ax: Axes, renderer, **text_kwargs) -> tuple:
     kwargs.pop('underline', None)
     
     # Try shaping if available
-    if HAS_HARFBUZZ:
+    # Only use HarfBuzz measurement if the text actually needs complex shaping.
+    # Otherwise, trust Matplotlib's native measurement which handles font fallback (e.g. lists of fonts) better.
+    if HAS_HARFBUZZ and _needs_complex_shaping(text):
         path = _resolve_font_path(kwargs)
         try:
             if path:
