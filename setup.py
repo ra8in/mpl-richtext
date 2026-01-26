@@ -44,6 +44,8 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "matplotlib>=3.5.0",
+        "uharfbuzz>=0.30.0",
+        "fonttools>=4.34.0",
     ],
     extras_require={
         "dev": [
