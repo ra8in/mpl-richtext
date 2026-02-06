@@ -70,3 +70,91 @@ def format_nepali_number(number):
         formatted = f"-{formatted}"
     
     return formatted
+
+
+# Mappings for convert_to_nepali
+_DIGIT_MAP = {
+    '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+    '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+}
+
+_DAY_MAP = {
+    'sunday': 'आइतबार',
+    'monday': 'सोमबार',
+    'tuesday': 'मङ्गलबार',
+    'wednesday': 'बुधबार',
+    'thursday': 'बिहिबार',
+    'friday': 'शुक्रबार',
+    'saturday': 'शनिबार'
+}
+
+_NEPALI_MONTH_MAP = {
+    'baishakh': 'वैशाख',
+    'jestha': 'जेठ',
+    'ashadh': 'असार',
+    'shrawan': 'साउन',
+    'bhadra': 'भदौ',
+    'ashwin': 'असोज',
+    'kartik': 'कार्तिक',
+    'mangsir': 'मंसिर',
+    'poush': 'पुस',
+    'magh': 'माघ',
+    'falgun': 'फागुन',
+    'chaitra': 'चैत'
+}
+
+_GREGORIAN_MONTH_MAP = {
+    'january': 'जनवरी',
+    'february': 'फेब्रुअरी',
+    'march': 'मार्च',
+    'april': 'अप्रिल',
+    'may': 'मे',
+    'june': 'जुन',
+    'july': 'जुलाई',
+    'august': 'अगस्ट',
+    'september': 'सेप्टेम्बर',
+    'october': 'अक्टोबर',
+    'november': 'नोभेम्बर',
+    'december': 'डिसेम्बर'
+}
+
+
+def convert_to_nepali(text):
+    """
+    Convert English digits, days, and months to Nepali Devanagari script.
+    
+    Args:
+        text: String or number to convert.
+    
+    Returns:
+        str: Text with English elements converted to Nepali.
+    
+    Examples:
+        >>> convert_to_nepali("Sunday, 1 Magh")
+        'आइतबार, १ माघ'
+        >>> convert_to_nepali("15 January 2024")
+        '१५ जनवरी २०२४'
+        >>> convert_to_nepali(123)
+        '१२३'
+    """
+    import re
+    
+    result = str(text)
+    
+    # Replace days (case-insensitive, whole words only)
+    for eng, nep in _DAY_MAP.items():
+        result = re.sub(rf'\b{eng}\b', nep, result, flags=re.IGNORECASE)
+    
+    # Replace Nepali months
+    for eng, nep in _NEPALI_MONTH_MAP.items():
+        result = re.sub(rf'\b{eng}\b', nep, result, flags=re.IGNORECASE)
+    
+    # Replace Gregorian months
+    for eng, nep in _GREGORIAN_MONTH_MAP.items():
+        result = re.sub(rf'\b{eng}\b', nep, result, flags=re.IGNORECASE)
+    
+    # Replace digits last
+    for eng, nep in _DIGIT_MAP.items():
+        result = result.replace(eng, nep)
+    
+    return result
