@@ -50,6 +50,7 @@ def richtext(
     y: float,
     strings: List[str],
     colors: Optional[Union[str, List[Any], Dict[Any, Any]]] = None,
+    styles: Optional[Dict[int, Dict[str, Any]]] = None,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> List[Text]:
@@ -68,6 +69,16 @@ def richtext(
         - A single string: Applied to all strings.
         - A list of colors: Corresponding to each string (dynamic extension supported).
         - A dictionary: Mapping indices to colors (e.g., {1: 'red'}). Unspecified indices use default/black.
+    styles : Dict[int, Dict[str, Any]], optional
+        Complete style specification per segment. Dictionary mapping string indices to style dictionaries.
+        Example: {0: {'color': 'red', 'size': 20, 'weight': 'bold'}, 1: {'color': 'blue'}}
+        
+        Supported properties:
+        - Standard names: color, fontsize, fontweight, fontfamily, fontstyle, alpha, etc.
+        - Aliases: size (fontsize), weight (fontweight), family (fontfamily), style (fontstyle)
+        
+        Priority: styles dict > individual kwargs > global defaults
+        Combine with global kwargs for maximum flexibility.
     ax : matplotlib.axes.Axes, optional
         The axes to draw on. If None, uses the current axes.
     **kwargs : dict
@@ -112,8 +123,21 @@ def richtext(
     transform = kwargs.pop('transform', ax.transData)
     zorder = kwargs.pop('zorder', 1)
     
+    # Auto-detect if 'colors' is actually a styles dict (dict of dicts)
+    # This allows user to pass styles dict as 4th positional parameter
+    if colors is not None and isinstance(colors, dict):
+        # Check if any value is a dict (indicating styles dict instead of colors dict)
+        first_value = next(iter(colors.values()), None) if colors else None
+        if isinstance(first_value, dict):
+            # This is a styles dict, not a colors dict
+            if styles is None:
+                styles = colors
+                colors = None
+            # If both were provided, styles takes precedence (already passed as styles param)
+    
+    
     # Normalize properties for each string segment
-    segment_properties = _normalize_properties(strings, colors, **kwargs)
+    segment_properties = _normalize_properties(strings, colors, styles=styles, **kwargs)
 
     # Get renderer for measuring text
     fig = ax.get_figure()
@@ -150,19 +174,38 @@ def richtext(
 def _normalize_properties(
     strings: List[str], 
     colors: Union[str, List[Any], Dict[Any, Any]], 
+    styles: Optional[Dict[int, Dict[str, Any]]] = None,
     **kwargs
 ) -> List[Dict[str, Any]]:
     """
-    Normalize colors and kwargs into a list of property dictionaries, one for each string.
+    Normalize colors, styles dict, and kwargs into a list of property dictionaries, one for each string.
     Supports:
     - Scalar values (applied globally).
     - Lists of values (dynamic extension).
     - Dictionaries with int/tuple keys (targeted overrides).
     - Lists of pairs [(indices, value)] (targeted overrides).
     - Plural arguments (e.g., fontsizes) overriding singular ones (e.g., fontsize).
+    - NEW: styles dict for complete per-segment specification.
+    
+    Priority Order:
+    1. Global scalar kwargs (defaults for all)
+    2. List-based and dict-based kwargs (targeted overrides)
+    3. styles dict (complete per-segment specification, highest priority)
     """
     n = len(strings)
     props_list = []
+    
+    # Property alias mapping for user-friendly names
+    PROPERTY_ALIASES = {
+        'weight': 'fontweight',
+        'size': 'fontsize', 
+        'family': 'fontfamily',
+        'style': 'fontstyle'
+    }
+    
+    def normalize_property_name(name: str) -> str:
+        """Normalize property name, converting aliases to standard names."""
+        return PROPERTY_ALIASES.get(name, name)
     
     # Helper to extend list to length n
     def extend_list(lst: List[Any], target_len: int) -> List[Any]:
@@ -280,8 +323,26 @@ def _normalize_properties(
         for k, v_map in mapping_kwargs.items():
             if i in v_map:
                 props[k] = v_map[i]
+        
+        # 5. Apply styles dict if provided (highest priority for specified segments)
+        if styles:
+            # Expand tuple keys in styles dict
+            # e.g., {(0, 2, 4): {...}} applies to indices 0, 2, and 4
+            for key, style_dict in styles.items():
+                indices_to_apply = []
+                if isinstance(key, tuple):
+                    indices_to_apply = list(key)
+                elif isinstance(key, int):
+                    indices_to_apply = [key]
+                
+                if i in indices_to_apply:
+                    # Normalize property names (handle aliases)
+                    for prop_name, prop_value in style_dict.items():
+                        normalized_name = normalize_property_name(prop_name)
+                        props[normalized_name] = prop_value
                 
         props_list.append(props)
+
         
     return props_list
 
