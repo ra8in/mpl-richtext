@@ -5,6 +5,7 @@ from matplotlib.lines import Line2D
 from matplotlib.lines import Line2D
 import matplotlib.font_manager as fm
 from matplotlib.font_manager import FontProperties, findfont
+import unicodedata
 from typing import List, Optional, Tuple, Union, Dict, Any
 
 from .shaping import ShapedText, HarfbuzzShaper, HAS_HARFBUZZ
@@ -139,6 +140,9 @@ def richtext(
     # Normalize properties for each string segment
     segment_properties = _normalize_properties(strings, colors, styles=styles, **kwargs)
 
+    # Preprocess: normalize control chars, split on \n → returns one group of segments per line
+    line_groups = _preprocess_whitespace(strings, segment_properties)
+
     # Get renderer for measuring text
     fig = ax.get_figure()
     if fig == None:
@@ -150,16 +154,14 @@ def richtext(
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
 
-    # Logic separation: Wrapping vs Non-Wrapping
-    if box_width is not None:
-        # 1. Tokenize into words with properties
-        words = _tokenize_strings(strings, segment_properties)
-        # 2. Build lines with wrapping
-        lines = _build_lines_wrapped(words, ax, renderer, box_width)
-    else:
-        # 1. Treat strings as segments
-        # 2. Build a single line
-        lines = [_build_line_seamless(strings, segment_properties, ax, renderer)]
+    # Build lines: each line group is processed independently through the pipeline
+    lines = []
+    for group_strings, group_props in line_groups:
+        if box_width is not None:
+            words = _tokenize_strings(group_strings, group_props)
+            lines.extend(_build_lines_wrapped(words, ax, renderer, box_width))
+        else:
+            lines.append(_build_line_seamless(group_strings, group_props, ax, renderer))
 
     # 3. Draw lines
     text_objects = _draw_lines(
@@ -346,14 +348,69 @@ def _normalize_properties(
         
     return props_list
 
+# Translation table for control character handling (built once at import time).
+# Uses unicodedata.category() == 'Cc' to find ALL Unicode control characters
+# (C0: U+0000-U+001F, DEL: U+007F, C1: U+0080-U+009F) dynamically —
+# no hardcoded ranges, stays correct across Unicode versions.
+_NEWLINE_CHARS = frozenset('\r\v\f\x85\u2028\u2029')  # chars to treat as \n
+_CONTROL_CHAR_TABLE = str.maketrans({
+    **{ch: '\n' for ch in _NEWLINE_CHARS},  # newline variants → \n
+    '\t': '    ',                            # tab → 4 spaces
+    **{                                      # all other Cc control chars → strip
+        chr(cp): None
+        for cp in range(0x110000)
+        if unicodedata.category(chr(cp)) == 'Cc'
+        and chr(cp) not in _NEWLINE_CHARS
+        and chr(cp) != '\t'
+        and chr(cp) != '\n'
+    },
+})
+
+
+def _preprocess_whitespace(
+    strings: List[str],
+    properties: List[Dict[str, Any]]
+) -> List[Tuple[List[str], List[Dict[str, Any]]]]:
+    """
+    Normalize control characters and split segments on newlines.
+
+    Returns a list of line groups. Each group is a (strings, properties) pair
+    representing one logical line — ready to pass directly into the existing
+    pipeline functions. The rest of the pipeline is completely unaware of newlines.
+
+    Control character handling:
+    - '\\r\\n', '\\r', '\\v', '\\f' → treated as '\\n' (line break)
+    - '\\t'                         → 4 spaces
+    - other control chars           → stripped
+    """
+    # Each entry: ([strings...], [props...])
+    line_groups: List[Tuple[List[str], List[Dict[str, Any]]]] = []
+    current_strings: List[str] = []
+    current_props: List[Dict[str, Any]] = []
+
+    for string, props in zip(strings, properties):
+        string = string.replace('\r\n', '\n').translate(_CONTROL_CHAR_TABLE)
+        parts = string.split('\n')
+        for i, part in enumerate(parts):
+            if i > 0:
+                # Commit the current line and start a new one
+                line_groups.append((current_strings, current_props))
+                current_strings, current_props = [], []
+            current_strings.append(part)
+            current_props.append(props)
+
+    # Commit the final line
+    line_groups.append((current_strings, current_props))
+    return line_groups
+
 
 def _tokenize_strings(
-    strings: List[str], 
+    strings: List[str],
     properties: List[Dict[str, Any]]
 ) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Split strings into words while preserving spaces and associating properties.
-    Used ONLY when wrapping is enabled.
+    Split strings into words while preserving trailing spaces and associating properties.
+    Used ONLY when wrapping is enabled. Receives a single line group — no newlines present.
     """
     words: List[Tuple[str, Dict[str, Any]]] = []
     for string, props in zip(strings, properties):
@@ -365,7 +422,7 @@ def _tokenize_strings(
                 if part:
                     words.append((part, props))
                 elif not part and i > 0:
-                     pass
+                    pass
     return words
 
 
@@ -593,6 +650,11 @@ def _draw_lines(
     # Calculate metrics for each line
     line_metrics = []
     for line in lines:
+        if not line:
+            # Empty line (e.g., from consecutive \n) - use default text height
+            default_h = _get_text_height("Hg", ax, renderer, fontsize=plt.rcParams['font.size'])
+            line_metrics.append((default_h, default_h * linespacing))
+            continue
         # Find max ascent and max total height in this line
         max_ascent = max(item[3] for item in line) if line else 0.0
         max_height = 0.0
